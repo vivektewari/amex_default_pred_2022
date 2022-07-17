@@ -1,0 +1,68 @@
+
+#folder and project information
+
+project: amex_kaggle_2022
+
+entity: vivektewari2000
+data_loc: /home/pooja/PycharmProjects/amex_default_kaggle/data/
+output_loc: /home/pooja/PycharmProjects/amex_default_kaggle/outputs/
+weight_loc : /home/pooja/PycharmProjects/amex_default_kaggle/data/weights/
+group: na
+feature_file_name: "feature_importance_v2.xlsx"
+## TRAINING params
+
+## MODEL params
+model_arch: FeatureExtractor
+nn_model_name: FeatureExtractor
+input_dim: [1,53,12,12]
+model_params:
+  channels : [100,200,100,50]
+  input_image_dim : [12, 12]
+  start_channel : 53
+  convs : [2 ,2,1,1,2]
+  pads : [0, 0,0,0,0]
+  strides : [1,1, 1,1,1]
+  pools : [2, 2,1,2,1] #receptive 6,
+  fc1_p : [null,5761]
+n_blocks: 24
+hidden_dim: 128
+embedding_dim: 32
+n_merge_layers: 1
+normalize: False
+sum_player_embeddings: False
+use_index_select: False
+rescale_value_input: True
+rescale_se_input: True
+# Conv-specific params
+
+
+
+## OPTIMIZER params
+optimizer_class: Adam
+optimizer_kwargs:
+  lr: 5e-5
+  # See https://arxiv.org/pdf/2105.05246.pdf
+  eps: 0.0003
+  #alpha: 0.9
+min_lr_mod: 0.01
+
+## LOSS params
+entropy_cost: 0.0002
+baseline_cost: 1.
+teacher_kl_cost: 0.005
+teacher_baseline_cost: 0.0
+# lambda parameter for TD-lambda and UPGO losses
+lmb: 0.9
+reduction: sum
+
+# MISCELLANEOUS params
+learning_rate: 0.01
+momentum: 0.01
+epsilon: 0.01
+alpha: 0.01
+actor_device: cuda:1
+learner_device: cuda:0
+model_log_freq: 100
+
+
+
