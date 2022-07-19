@@ -1,6 +1,8 @@
+import random
+
 from torch.utils.data import Dataset
 import pandas as pd
-import torch
+import torch,pickle
 import numpy as np
 
 from utils.data_packing import packing
@@ -66,62 +68,118 @@ class DigitData_mult_object(DigitData):
 
         return out
 class amex_dataset(Dataset):
-    def __init__(self, group, n_skill, max_seq=MAX_SEQ, dev=True):  # HDKIM 100
+    def __init__(self, group=None, n_skill=4 , max_seq=13, dev=True):  # HDKIM 100
         super(amex_dataset, self).__init__()
         self.max_seq = max_seq
         self.n_skill = n_skill
-        self.samples = group
+
         self.dev = dev
         #         self.user_ids = [x for x in group.index]
         self.user_ids = []
-        for user_id in group.index:
+        if dev:
+            self.group_t = pickle.load(open(group[1], 'rb'))
+            group=pickle.load(open(group[0], 'rb'))
+
+        self.samples = group
+        for user_id in group.keys():
             self.user_ids.append(user_id)
 
     def __len__(self):
         return len(self.user_ids)
 
     def __getitem__(self, index):
-        # print(time.time()-start,2.0)
-        feature = 2 + featureFinal  # len(tup[])##################chnage
+
         user_id = self.user_ids[index]
-        # print(user_id)
-        tup = self.samples[user_id]
-        seq_len = len(tup[0])
-        tuparray = np.array(tup)
-        outs = np.zeros((feature + 2, self.max_seq), dtype='float32')
-        outs[3, :] = -1
+        tuparray = torch.from_numpy(self.samples[user_id].astype(np.float))
+        seq_len = tuparray.shape[0]
+        #tuparray = np.array(tup)
+
         if seq_len >= self.max_seq:
-            outs[2:, :] = tuparray[:, -self.max_seq:]
+            outs = tuparray[-self.max_seq:,:]
         else:
-            outs[2:, -seq_len:] = tuparray
+            outs = torch.cat((tuparray,torch.ones((self.max_seq-seq_len,tuparray.shape[1]))))
 
-        # print(time.time()-start,2.4)
-        target_id = outs[2, 1:].copy()
-        x = outs[2, :-1].copy()
-        x += (outs[3, :-1] == 1) * self.n_skill
-        if self.dev:
-            label = outs[3, 1:]
-            label, weights = np.where(label == -1, 0, label), np.where(label == -1, 0, 1)
-            outs = outs[:, 1:]
-            outs[2, :] = label
-            outs[3, :] = weights
+        if self.dev: return {'image_pixels':outs.to(torch.float32),'targets':torch.tensor(self.group_t[index],dtype=torch.float32)}
+        else:return {'image_pixels':outs.to(torch.float32),'targets':torch.tensor(0,dtype=torch.float32)}
 
-        else:
-            outs = outs[:, 1:]
-            outs[2, :] = 0
-            outs[3, :] = 0
+    @classmethod
+    def create_dict(cls,df_loc,key,var_drop=['customer_ID', 'S_2'],target=None,batch=1000,max_row=None,identifier=''):
+        #todo check if none row are missed or docuble calcuated
+        def breakinUsers(r):
+            r = r.drop(var_drop, axis=1)
+            return r.to_numpy()
+        if max_row is not None:df=pd.read_csv(df_loc,usecols=[key],nrows=max_row)
+        else:df=pd.read_csv(df_loc,usecols=[key])
+        max_row=df.shape[0]
 
-        outs[0, :] = x
-        outs[1, :] = target_id
+        if target is not None:
+            target_dict=pd.read_csv(df_loc,usecols=[key,target],nrows=max_row).groupby('customer_ID').tail(1).set_index(key)[target]
 
-        # ret=[x, target_id, label,weights]+list(outs[2:,:])
+        rows = df[[key]].drop_duplicates(subset=['customer_ID'], keep='last').index.to_list()
+        df=0
+        group = pd.Series([])
+        loop=1
+        from_row = 0
+        max_row=rows[-1]+1
+        print(max_row)
 
-        #         #print((time.time()-start)*1000,2.6)
-        #         #print(time.time()-start,2.6)
-        return tuple(outs)  # x, target_id, label,weights,t,lect_count,relevantLectattended,quest_roll_average_50
+        while from_row <= max_row:
+            if from_row==max_row:break
+            elif loop*batch<=len(rows):
+                to_row=rows[loop*batch]+1
+            else :
+                to_row=max_row
+            train = pd.read_csv(df_loc, skiprows=range(1, from_row + 1),
+                                nrows=to_row-from_row, header=0)
+            train=train.set_index(key).replace([np.inf,-np.inf,np.nan,np.inf],0.00).select_dtypes(exclude=['object','O']).reset_index() #todo check for better replacement
+
+            if train.shape[0]>1:group=group.append(train.groupby('customer_ID').apply(breakinUsers))
+            loop+=1
+            print(from_row,to_row)
+            from_row = to_row
+        if target is not None:
+            with open(config.data_loc +'data_created/'+identifier+'dict1.pkl', 'wb') as f:
+                pickle.dump(group.reset_index(drop=True).to_dict(), f)
+            with open(config.data_loc +'data_created/'+identifier+'dict2.pkl', 'wb') as f:
+                pickle.dump(target_dict.reset_index(drop=True).to_dict(), f)
+        return group
+
+
+
 
 
 #     #train_df[train_df['user_id']==115]
 
 
 if __name__ == "__main__":
+    from input_diagnostics.common import *
+    import random
+    def west1():
+        df_loc='/home/pooja/PycharmProjects/amex_default_kaggle/data/data_created/hold_out.csv'
+        t=amex_dataset.create_dict(df_loc=df_loc,key='customer_ID',var_drop=['customer_ID','target'],target='target',batch=1000,max_row=30000,identifier='test_')
+        #pickle_jar=[config.data_loc +'data_created/'+'dict1.pkl',config.data_loc +'data_created/'+'dict2.pkl']
+        #q=amex_dataset(group = pickle_jar, n_skill = 4, max_seq = 13, dev = True)
+        #d=q.__getitem__(3)
+    def west2(): #cheking if pickle files are correct
+        df_loc = '/home/pooja/PycharmProjects/amex_default_kaggle/data/data_created/hold_out.csv'
+
+        source=pd.read_csv(df_loc,nrows=100000)
+        custs=source['customer_ID'].unique()
+
+        group= [config.data_loc + 'data_created/' + 'v_dict1.pkl',
+                      config.data_loc + 'data_created/' + 'v_dict2.pkl']
+        group_t = pickle.load(open(group[1], 'rb'))
+        group = pickle.load(open(group[0], 'rb'))
+        target_cust=random.randint(0,1000)
+        source=source[source['customer_ID']==custs[target_cust]]
+        dest=group[target_cust]
+        dest_val=group_t[target_cust]
+        d=0
+
+    west1()
+
+
+
+
+    f=0
+    # print(start-stop)

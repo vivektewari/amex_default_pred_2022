@@ -6,10 +6,21 @@ import matplotlib.pyplot as plt
 import gc, random, cv2
 from itertools import permutations, combinations
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
-
-import torch
 from prettytable import PrettyTable
-
+import torch
+from sklearn.metrics import roc_curve, auc
+from prettytable import PrettyTable
+def count_parameters(model):
+    table = PrettyTable(["Modules", "Parameters"])
+    total_params = 0
+    for name, parameter in model.named_parameters():
+        if not parameter.requires_grad: continue
+        param = parameter.numel()
+        table.add_row([name, param])
+        total_params += param
+    print(table)
+    print(f"Total Trainable Params: {total_params}")
+    return total_params
 
 def get_dict_from_class(class1):
     return {k: v for k, v in class1.__dict__.items() if not (k.startswith('__') and k.endswith('__'))}
@@ -52,4 +63,31 @@ class clusterring():
             plt.show()
 
 
+def lorenzCurve(y_test,y_score,save_loc=None):
+    n_classes = 1
+    fpr = dict()
+    tpr = dict()
+    roc_auc = dict()
+    for i in range(n_classes):
+        fpr[i], tpr[i], _= roc_curve(y_test, y_score)
+        roc_auc[i] = auc(fpr[i], tpr[i])
 
+    # Compute micro-average ROC curve and ROC area
+    fpr["micro"], tpr["micro"], _ = roc_curve(y_test.ravel(), y_score.ravel())
+    roc_auc["micro"] = auc(fpr["micro"], tpr["micro"])
+
+    #Plot of a ROC curve for a specific class
+
+    plt.figure()
+    lw = 2
+    plt.plot(fpr[0], tpr[0], color='darkorange',
+             lw=lw, label='ROC curve (area = %0.2f)' % roc_auc[0])
+    plt.plot([0, 1], [0, 1], color='navy', lw=lw, linestyle='--')
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('Receiver operating characteristic example')
+    plt.legend(loc="lower right")
+    if save_loc is not None:plt.savefig(save_loc)
+    else:plt.show()

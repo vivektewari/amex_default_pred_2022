@@ -1,6 +1,7 @@
 import pandas as pd,json
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score,roc_auc_score
 import numpy as np
+from datetime import datetime
 def bad_capture(y,x,perc=4):
     x_array=np.array(x)
     boundary_val=np.percentile(x_array,100-perc)
@@ -66,7 +67,7 @@ def updateMetricsSheet(dev_actual, dev_pred, hold_actual, hold_pred, loc="", mod
         if not force: raise Exception("model exist. try with Force as True or different model name")
         # else:f.drop(f[f[model]==modelName].index,axis=0)
     metricsDev, metricsHold = getMetrics(dev_actual, dev_pred), getMetrics(hold_actual, hold_pred)
-    entryVal = modelName, *metricsDev, *metricsHold, extraInfo
+    entryVal = datetime.now(),modelName, *metricsDev, *metricsHold, extraInfo
     dict = {}
 
 

@@ -1,6 +1,6 @@
 import pandas as pd
 import torch
-from utils.funcs import getMetrics,DataCreation,vison_utils
+from output_diagnostics.metrics import amex_metric
 from utils.visualizer import Visualizer
 import os
 
@@ -14,7 +14,7 @@ class MetricsCallback(Callback):
                  check_interval=1,
                  input_key: str = "targets",
                  output_key: str = "logits",
-                 prefix: str = "acc_pre_rec_f1",
+                 prefix: str = "amex_metric",
 
                  ):
         super().__init__(CallbackOrder.Metric)
@@ -56,16 +56,19 @@ class MetricsCallback(Callback):
             state.stage_epoch_step) + ".pth")
 
         if (state.stage_epoch_step + 1) % self.check_interval == 0:
-            preds = torch.argmax(state.batch['logits'], dim=1)
-            print("{} is {}".format(self.prefix, getMetrics(state.batch['targets'], preds)))
+            preds = state.batch['logits']
+            metric=amex_metric(state.batch['targets'], preds)
+            print("{} is {}".format(self.prefix,metric ))
             self.visualizer.display_current_results(state.stage_epoch_step, state.epoch_metrics['train']['loss'],
                                                     name='train_loss')
             self.visualizer.display_current_results(state.stage_epoch_step, state.epoch_metrics['valid']['loss'],
                                                     name='valid_loss')
-            self.visualizer.display_current_results(state.stage_epoch_step, state.epoch_metrics['train']['accuracy'],
-                                                    name='train_accuracy')
-            self.visualizer.display_current_results(state.stage_epoch_step,
-                                                    state.epoch_metrics['valid']['accuracy'], name='valid_accuracy')
+            self.visualizer.display_current_results(state.stage_epoch_step, metric[0],
+                                                    name='amex_metric')
+            self.visualizer.display_current_results(state.stage_epoch_step, metric[1],
+                                                    name='bad_capture')
+            self.visualizer.display_current_results(state.stage_epoch_step, metric[2],
+                                                    name='auc')
 class MetricsCallback_loc(Callback):
 
     def __init__(self,
@@ -75,7 +78,7 @@ class MetricsCallback_loc(Callback):
                  input_key: str = "targets",
                  output_key: str = "logits",
                  prefix: str = "bound_loss,classification_loss,acc_pre_rec_f1",
-                 func = getMetrics,
+                 func = amex_metric,
                  pixel =None):
         super().__init__(CallbackOrder.Metric)
 
@@ -86,7 +89,6 @@ class MetricsCallback_loc(Callback):
         self.model_name = model_name
         self.check_interval = check_interval
         self.func = func
-        self.drawing=DataCreation(image_path_='/home/pooja/PycharmProjects/digitRecognizer/rough/localization/images')
         self.vision_utils = vison_utils
         self.visualizer = Visualizer()
         self.pixel = pixel
@@ -105,27 +107,7 @@ class MetricsCallback_loc(Callback):
 
     # score = f1_score(y_true, y_pred, average="macro")
     # state.batch_metrics[self.prefix] = score
-    def draw_image(self, preds,color_intensity,msg= ""):
-        i=0
-        list_ = os.listdir(self.drawing.image_path)
-        for img in list_:
-            if img.find("pred") != -1:os.remove(self.drawing.image_path+"/"+img)
-        list_ = os.listdir(self.drawing.image_path)
-        list_.sort(key=lambda x: int(x.split("_")[0]))
 
-
-        for img in list_[0:50]:
-            self.drawing.draw_box(preds[i],color_intensity=color_intensity,scale=self.pixel,data=None,save_loc=self.drawing.image_path+"/"+img,msg =(msg[0][i], msg[1][i]))
-            i+=1
-            if i==10 :break
-
-    def rub_pred(self):
-        i=0
-        # list_=os.listdir(self.drawing.image_path)
-        # list_.sort(key=lambda x: int(x.split("_")[0]))
-        # for img in list_[0:9]:
-        #     self.drawing.rub_box(data =None,dim=2,save_loc=self.drawing.image_path+"/"+img)
-        #     i+=1
     def on_epoch_end(self, state: Runner):
         """Event handler for epoch end.
 
@@ -145,7 +127,7 @@ class MetricsCallback_loc(Callback):
             #pred_class= torch.argmax(state.batch['logits'][:,:10], dim=1)
             temp = preds.reshape((preds.shape[0],box_count,15))[:,:,:11]
             pred_class=torch.argmax(temp.reshape((preds.shape[0],box_count*11)), dim=1)%11
-            accuracy_metrics=getMetrics(state.batch['targets'][:, 0], pred_class)
+            #accuracy_metrics=getMetrics(state.batch['targets'][:, 0], pred_class)
             loss=self.func(state.batch['targets'], preds)
             print("{} is {}{}".format(self.prefix, loss,accuracy_metrics))
             self.visualizer.display_current_results(state.stage_epoch_step, state.epoch_metrics['train']['loss'],
@@ -190,20 +172,7 @@ class MetricsCallback_loc(Callback):
             self.get_grads(state)
 
             #print("max_gradient is "+ torch.max(state.model.state_dict().values()[0]))
-    def pred_boxes(self,model_pred_output,classes):
-        n_class=len(classes)
-        boxes = int(model_pred_output.shape[1] / (n_class + 4))
-        scores = model_pred_output[:, :boxes * n_class]
-        locs = model_pred_output[:, boxes * n_class:]
-        pred_boxes = self.vision_utils.create_boxes(scores, n_class, locs)
-        batch_size=model_pred_output.shape[0]
-        return_boxes=[]
-        for i in range(batch_size):
-            pred_boxes_i = self.vision_utils.non_max_suppression(pred_boxes[i], classes, background_class=10,
-                                                                 pred_thresh=0.9, overlap_thresh=0)
-            return_boxes.append(pred_boxes_i)
 
-        return return_boxes
     def get_prec_recall(self,targets,model_pred_output):
         """
         Algo:
@@ -238,31 +207,6 @@ class MetricsCallback_loc(Callback):
 
         max_prec,max_rec,min_prec,min_rec=max(precision[1:]),max(recall[1:]),min(precision[1:]),min(recall[1:])
         return  [precision[0],recall[0],max_prec,max_rec,min_prec,min_rec]
-    def get_grads(self, state):
-        # model train/valid step
-        x, y = state.batch['image_pixels'],state.batch['targets']
-        model=state.model
-        y_hat =model(x)
-        loss=state.criterion(y_hat,y)
-        loss.backward()
-
-        #get the blocks
-        if state.global_epoch_step==1:
-            self.grad_column_names=['epoch']
-            for block in state.model.state_dict().keys():
-                self.grad_column_names.extend([block+"_"+i for i in  ['min','mean','max']])
-
-            pd.DataFrame(columns=self.grad_column_names).to_csv(str(self.directory)+"//grads.csv")
-        val_dict= {'epoch':state.global_epoch_step}
-        funcs=[torch.min,torch.mean,torch.max]
-        loop=1
-        for block in state.model.state_dict().keys():
-            key = int(block.split('conv_blocks.')[1].split(".")[0])
-            temp=model.conv_blocks[key].conv.weight.grad
-            for f in funcs:
-                val_dict[self.grad_column_names[loop]]=[float(torch.abs(f(temp)))]
-                loop+=1
-        pd.DataFrame.from_dict(val_dict).to_csv(str(self.directory)+"//grads.csv",mode='a',header=False)
 
 
 

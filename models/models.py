@@ -133,89 +133,61 @@ class FeatureExtractor(nn.Module):
 
 
 class FFN(nn.Module):
-    def __init__(self, state_size=200,final_size=200):
+    def __init__(self, input_size=200, final_size=200):
         super(FFN, self).__init__()
-        self.state_size = state_size
+        self.state_size = input_size
 
-        self.lr1 = nn.Linear(state_size, state_size)
+        self.lr1 = nn.Linear(input_size, input_size)
         self.relu = nn.ReLU()
-        self.lr2 = nn.Linear(state_size, final_size)
+        self.lr2 = nn.Linear(input_size, final_size)
         self.dropout = nn.Dropout(0.2)
     def forward(self, x):
         x = self.lr1(x)
         x = self.relu(x)
         x = self.lr2(x)
         return self.dropout(x)
-class transformer_encoder_block():
-    def __init__(self,input_size,output_size,num_heads=4,drop_out=0.2):
+class transformer_encoder_block(nn.Module):
+    def __init__(self,input_size,output_size,num_heads=2,drop_out=0.2):
+        super(transformer_encoder_block, self).__init__()
         self.multi_att = nn.MultiheadAttention(embed_dim=input_size, num_heads=num_heads, dropout=drop_out)
         self.dropout = nn.Dropout(0.2)
         self.layer_normal = nn.LayerNorm(input_size)
         self.ffn = FFN(input_size,output_size)
 
-    def forward(self, x, question_ids, *args):
-        see = False
-        outs = []
-        loop = 0
-        for i in args:
-            if loop < 4:
-                outs.append(i.unsqueeze(2))
-            else:
-                outs.append(i)
-            loop += 1
+    def forward(self, x):
+        see=False
 
-
-        device = x.device
-
-        if see: print(x.shape, question_ids.shape, 23)
-        elif False:
-            x = torch.cat(
-                (x, z,), axis=2)
-            # print(x.shape,z.shape)
-
-        #         else:
-        #             x = torch.cat(
-        #                 (x,outs[0],outs[1],outs[2],outs[3],), axis=2)#xself.pos_embedding(x)
-        # print(x[0][0])
-        # print(x.shape)
-        # x = x + pos_x
-
-        x = x.permute(1, 0, 2)  # x: [bs, s_len, embed] => [s_len, bs, embed]
-        e = e.permute(1, 0, 2)
+        att_output, att_weight = self.multi_att(key=x, query=x,value= x)
 
 
 
-        att_output, att_weight = self.multi_att(x, x, x, attn_mask=att_mask)
-        if see: print(att_output.shape, z.shape)
+        att_output = self.layer_normal(att_output )  # +additona+ e
+        #att_output = att_output.permute(1, 0, 2)  # att_output: [s_len, bs, embed] => [bs, s_len, embed]
+        x = self.ffn(att_output) +att_output
 
-        # print(x[0][0])
-        if see: print(att_output.shape, z.shape, 1)
-        att_output = self.layer_normal(att_output + e)  # +additona+ e
-        if see: print(att_output.shape, z.shape, 2)
-        att_output = att_output.permute(1, 0, 2)  # att_output: [s_len, bs, embed] => [bs, s_len, embed]
-        if see: print(att_output.shape, 3)
-        if False:
-            att_output = torch.cat(
-                (att_output, y,), axis=2)
-        if see: print(y[0], 12)  # ,att_output)
-        x = self.ffn(att_output)
-        if see: print(att_output.shape, x.shape, 4)
-        # x = self.layer_normal2(x +att_output)#x
-        x = self.pred(x)
-        # print(att_weight[0][0])
 
         return x.squeeze(-1), att_weight
-class transformer_v1():
-    def __init__(self,input_size,output_size,num_blocks):
+class transformer_v1(nn.Module):
+    def __init__(self,input_size,output_size,num_blocks,seq_len=13):
+        self.num_blocks=num_blocks
+        super(transformer_v1, self).__init__()
         self.encoders_blocks = nn.ModuleList()
         for i in range(self.num_blocks):
-            self.encoders_blocks.append(transformer_encoder_block(input_size=input_size,output_size=input_size,num_heads=4,drop_out=0.2))
+            self.encoders_blocks.append(transformer_encoder_block(input_size=input_size,output_size=input_size,num_heads=2,drop_out=0.2))
 
-        self.final_layer=FFN(self, state_size=input_size,final_size=output_size)
+        self.final_layer=FFN(input_size=input_size*seq_len, final_size=output_size)
     def forward(self,x):
+        x=x.permute(1,0,2)
         for i in range(self.num_blocks):
-            x=self.encoders_blocks[i](x)
-        output=self.final_layer(x)
-        return output
+            #print(x.shape)
+            x,att_weights=self.encoders_blocks[i](x)
+
+        x=self.final_layer(x.permute(1, 0, 2).flatten(start_dim=1))
+        return F.sigmoid(x.flatten())
+if __name__ == "__main__":
+    model=transformer_v1(input_size=188,output_size=1,num_blocks=1)
+    out=model(torch.ones((13,10,188)))
+    h=0
+
 
 
