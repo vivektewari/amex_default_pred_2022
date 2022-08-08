@@ -8,7 +8,7 @@ from types import SimpleNamespace
 with open('../config.yaml', 'r') as f:
     config = SimpleNamespace(**yaml.safe_load(f))
 
-train=pd.read_csv(config.data_loc+"data_created/"+"dev.csv")#,nrows=10000,
+train=pd.read_csv(config.data_loc+"from_radar/"+"dev.csv")#,nrows=10000,
 train= train.groupby('customer_ID').tail(1).set_index('customer_ID')
 #train_label=pd.read_csv(config.data_loc+"from_kaggle/"+"train_labels.csv",index_col='customer_ID')
 #train=train.join(train_label)

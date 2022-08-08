@@ -7,9 +7,13 @@ from types import SimpleNamespace
 from common import *
 
 start_time = time.time()
-train_feature=pd.read_csv(config.data_loc+"data_created/"+"dev.csv")
-train_label=pd.read_csv(config.data_loc+"from_kaggle/"+"train_labels.csv",index_col='customer_ID')
+train_feature=pd.read_csv(config.data_loc+"from_radar/"+"dev.csv")
 train_feature= train_feature.groupby('customer_ID').tail(1).set_index('customer_ID')
+
+#train_label=pd.read_csv(config.data_loc+"from_radar/"+"train_labels.csv",index_col='customer_ID')
+train_label=train_feature['target']
+#=train_feature.drop('target',axis=1)
+
 
 df=train_feature.select_dtypes(exclude=['object','O'])
 df=df.replace([np.inf,-np.inf,np.nan],0.00)#.notnull().all(axis=1)]

@@ -63,7 +63,7 @@ class clusterring():
             plt.show()
 
 
-def lorenzCurve(y_test,y_score,save_loc=None):
+def lorenzCurve(y_test,y_score,save_loc=None,weight=1):
     n_classes = 1
     fpr = dict()
     tpr = dict()

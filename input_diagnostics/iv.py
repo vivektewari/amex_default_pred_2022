@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 from utils.data_packing import objectTodf,dfToObject,packing
 import warnings
-#from dataManager import dataObject
+from input_diagnostics.dataManager import dataObject
 
 class variable():
     def __init__(self,name,type,bins=[],woe=[],missingWoe=0,catDictionary={}):
@@ -37,7 +37,7 @@ class variable():
 
 
 class IV():
-    def __init__(self,getWoe=0,verbose=0,loc=None):
+    def __init__(self,getWoe=0,verbose=0,loc=None,sort_feature='WoE'):
         """
         :param variables: variables Dict of variable |
 
@@ -51,6 +51,7 @@ class IV():
         self.verbose=verbose
         self.loc=None
         self.excludeList=[]
+        self.sort_feature=sort_feature
 
     def saveVarcards(self,loc=None,name='ivReport'):
         cards=self.variables.values()
@@ -87,6 +88,15 @@ class IV():
         """
         lst = []
         uniqueValues=list(dataset[feature].unique())
+        if len(uniqueValues)==1:pass
+        elif "Missing" in uniqueValues:
+            uniqueValues.remove("Missing")
+            uniqueValues.sort()
+            uniqueValues=uniqueValues+["Missing"]
+        else:uniqueValues.sort()
+
+
+        #dataset = dataset.replace('Missing', np.nan).sort_values(feature).replace(np.nan, 'Missing')
         for i in range(len(uniqueValues)):
             val = uniqueValues[i]
             lst.append({
@@ -98,15 +108,20 @@ class IV():
 
         dset = pd.DataFrame(lst)
 
+
         dset['Distr_Good'] = dset['Good'] / dset['Good'].sum()
         dset['Distr_Bad'] = dset['Bad'] / dset['Bad'].sum()
         dset['WoE'] = np.log(dset['Distr_Good'] / dset['Distr_Bad'])
+        dset['Bad_Rate'] = dset['Distr_Bad'] / dset['All']
+        dset['Rank_Order'] = (dset['Bad_Rate']-dset['Bad_Rate'].shift(1))>=0
+        dset['Rank_Order'][0]=np.nan
+        if dset['Value'][len(dset)-1]=='Missing':dset['Rank_Order'][len(dset)-1]=np.nan
         dset = dset.replace({'WoE': {np.inf: 0, -np.inf: 0}})
         dset['IV'] = (dset['Distr_Good'] - dset['Distr_Bad']) * dset['WoE']
         if self.modeBinary==1:iv = dset['IV'][1]
         else :iv = dset['IV'].sum()
 
-        dset = dset.sort_values(by='WoE')
+        if self.sort_feature is not None:dset = dset.sort_values(by=self.sort_feature)
         dset1=dset
         if self.getWoe==1:
             temp=feature
@@ -182,11 +197,13 @@ class IV():
 
 
                 elif var.type == 'cont':
+
                     if binningOnly == 0:
                         temp.loc[remainingIndexes, [var.name]] = pd.cut(temp.loc[remainingIndexes][var.name], bins=var.bins,
-                                                                        labels=var.woe, ordered=False)
+                                                         labels=var.woe, ordered=False)
                         temp = temp.fillna(var.missingWoe)
                     else:
+
                         temp.loc[remainingIndexes, [var.name]] = pd.cut(temp.loc[remainingIndexes][var.name], bins=var.bins)
                         temp = temp.fillna('Missing')
 
@@ -224,7 +241,6 @@ class IV():
         contCols = list(set(allCols) - set(catCols))
         if self.verbose == 1: print("starting binning")
         for feature in contCols:
-	
             if self.verbose == 1: print(feature)
             temp = df[[feature]]
             missings = temp[temp.isnull().any(axis=1)]  # 'getting missing dataset'
@@ -306,6 +322,11 @@ class IV():
                 #print('WoE and IV for column: {}'.format(col))
                 df, iv = self.calculate_woe_iv(X[[col,target]], col, target)
                 df['variable']=col
+
+                # df_m=df[df['Value']=='Missing']
+                # df_wm=df.drop(df_m.index,axis=0).sort_values('Value')
+                # df=df_wm.append(df_m)
+
                 ivData=ivData.append(df)
 
         return ivData

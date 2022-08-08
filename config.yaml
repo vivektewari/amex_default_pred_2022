@@ -7,13 +7,14 @@ entity: vivektewari2000
 data_loc: /home/pooja/PycharmProjects/amex_default_kaggle/data/
 output_loc: /home/pooja/PycharmProjects/amex_default_kaggle/outputs/
 weight_loc : /home/pooja/PycharmProjects/amex_default_kaggle/data/weights/
+rough_loc: /home/pooja/PycharmProjects/amex_default_kaggle/data/data_created/rough/
 group: na
-feature_file_name: "feature_importance_v2.xlsx"
+feature_file_name: "feature_importance_v3.xlsx"
 ## TRAINING params
 
 ## MODEL params
 model_arch: transformer_encoder_block
-model: transformer_v1
+model:  simple_nn #var_attention_block #transformer_v1 #transformer_v1   #simple_nn #simple_attention_block #
 input_dim: [1,53,12,12]
 (self,input_size,output_size,num_heads=4,drop_out=0:
   2):
@@ -35,7 +36,7 @@ optimizer_kwargs:
 min_lr_mod: 0.01
 
 ## LOSS params
-loss_func: BCELoss
+loss_func: BCELoss # L2Loss #L2Loss_with_penality  # L2Loss #Weighted_BCELoss #Weighted_BCELoss #distance_BCELoss # BCELoss # Weighted_BCELoss #
 # lambda parameter for TD-lambda and UPGO losses
 lmb: 0.9
 reduction: sum

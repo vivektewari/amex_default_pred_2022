@@ -42,7 +42,7 @@ def treatment_outlier(df, vars, bottomCaps=None, upperCaps=None, percentile=[0.0
 def distReports(df,ivReport=None,detail=False,uniqueVaNum=10,exclude=None):
         if isinstance(df, str):df=pd.read_csv(df)
         if exclude is not None:df=df.drop(exclude,axis=1)
-        mis = pd.DataFrame({'varName':df.columns.values,'missing':df.isnull().values.sum(axis=0)}, index=df.columns.values)  # new df from existing
+        mis = pd.DataFrame({'varName':df.columns.values,'missing':df.isnull().values.sum(axis=0),'dtypes':df.dtypes},index=df.columns.values)  # new df from existing
         basta = (df.describe()).transpose()
 
         mis['missing_percent'] = mis['missing'] / df.shape[0]  # new column creation
@@ -51,8 +51,8 @@ def distReports(df,ivReport=None,detail=False,uniqueVaNum=10,exclude=None):
         if detail:
                 uniques = pd.DataFrame({'nuniques': df.nunique()}, index=df.columns.values)
                 final =final.join(uniques)
-                # indexSubset=min(df.shape[0],1000)
-                # final['uniqueValues'] = final['varName'].apply(lambda x: df.head(indexSubset)[x].unique()[0:uniqueVaNum])
+                #indexSubset=df.shape[0]
+                final['uniqueValues'] = final['varName'].apply(lambda x: df[x].unique()[0:uniqueVaNum])
 
 
         if ivReport is not None :final=final.join(ivReport)
