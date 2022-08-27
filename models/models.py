@@ -12,7 +12,7 @@ class FFN(nn.Module):
         self.state_size = input_size
         #self.layer_normal = nn.LayerNorm(input_size)
         self.lr1 = nn.Linear(input_size, final_size)
-        self.activation= nn.ReLU()#nn.LeakyReLU()
+        self.activation= nn.LeakyReLU() #nn.ReLU()
         self.dropout = nn.Dropout(dropout)
         self.apply_activation=activation
 
@@ -92,32 +92,34 @@ class transformer_encoder_block(nn.Module):
 class simple_attention_block(nn.Module):
     def __init__(self,input_size,output_size,num_heads=2,dropout=0.2,num_blocks=1):
         super(simple_attention_block, self).__init__()
-        self.multi_att = nn.MultiheadAttention(embed_dim=1, num_heads=1, dropout=dropout)
+        self.multi_att = nn.MultiheadAttention(embed_dim=4, num_heads=1, dropout=dropout)
         self.dropout = nn.Dropout(dropout)
-        self.layer_normal0 = nn.LayerNorm(input_size)
+        self.layer_normal0 = nn.LayerNorm(input_size*4)
         self.layer_normal1 = nn.LayerNorm(input_size)
         self.ffn0 = FFN(input_size , input_size*3 , dropout=dropout, activation=False)
-        self.ffn1 = FFN(input_size,input_size*2,dropout=dropout,activation=False)
+        self.ffn1 = FFN(input_size*4,input_size*2,dropout=dropout,activation=False)
         self.ffn2 = FFN(input_size*2, output_size,activation=False)
 
 
     def forward(self, x):
         #print(torch.max(self.state_dict()['multi_att.in_proj_weight']), torch.min(self.state_dict()['multi_att.in_proj_weight']))
         #x = self.layer_normal0(x) # removing it is causing  slow or almost no learnign
-        x=x[:,-1:,:]
+        x=x[:,:,:]
+
 
         #x=self.ffn0(x)
 
-        x = x.permute(2, 0, 1)
+        x = x.permute(1, 0, 2)
 
         # this is mention in multihead attention pytorch document
         att_output,att_weight = self.multi_att(key=x, query=x,value= x)
 
-        x=self.layer_normal1(att_output.permute(1,2,0)+x.permute(1,2,0))
+        x=att_output.permute(1,0,2)+x.permute(1,0,2)
+        x=self.layer_normal0(x.flatten(start_dim=1))
         #print(torch.max(x),torch.min(x),torch.std(x))
         x=F.relu(x) # relu lets it concentrate on few things only, and this thing worked to establish materilaity of attention block
 
-        x=self.ffn1(x.flatten(start_dim=1))
+        x=self.ffn1(x)
         x=self.ffn2(x)
         return F.sigmoid(x.flatten())
 class var_attention_module(nn.Module):
@@ -159,12 +161,7 @@ class var_attention_block(nn.Module):
         #print(torch.max(self.state_dict()['multi_att.in_proj_weight']), torch.min(self.state_dict()['multi_att.in_proj_weight']))
         #x = self.layer_normal0(x) # removing it is causing  slow or almost no learnign
         x=x[:,-1:,:]
-        #x=self.attn1(x)
 
-        #x=self.ffn2(self.ffn1(x))
-        #x=self.attn2(x)
-
-        #x=self.ffn3(x)
         x=self.ffn4(x)
 
 
@@ -179,7 +176,9 @@ class simple_nn(nn.Module):
         self.layer_normal1 = nn.LayerNorm(input_size*13*2)
         self.dropout=dropout
         # featur engenereing in params 0,1 | time extracting variable sin params 2,3, |100 combination from column space
-        params=[(input_size*13,input_size*13*2,0,0),(input_size*13*2,100,1,0),(100,output_size,0,0)]#,(13,1,0,0),(1,1,0,0),(1*100,100,0,1),(100,1,0,1)]
+        #params=[(input_size*13,input_size*13*2,0,0),(input_size*13*2,100,1,0),(100,output_size,0,0)]#,(13,1,0,0),(1,1,0,0),(1*100,100,0,1),(100,1,0,1)]
+        params = [(input_size * 13, input_size * 13 * 2, 0, 0), (input_size * 13 * 2, 100, 1, 0),
+                  (100, output_size, 0, 0)]  # ,(13,1,0,0),(1,1,0,0),(1*100,100,0,1),(100,1,0,1)]
         loop=0
         self.params=[]
         for param in params:
@@ -190,8 +189,6 @@ class simple_nn(nn.Module):
 
             self.ffns.append(FFN(param[0],param[1], dropout=self.dropout, activation=param[2]))
 
-
-
     def forward(self, x):
 
         for i in range(len(self.ffns)):
@@ -199,12 +196,204 @@ class simple_nn(nn.Module):
             x=x.flatten(start_dim=1)
             if self.params[i][3] != 0: x = self.layer_norm[i](x)
             x = self.ffns[i](x)
-
-
-
-
-
         return F.sigmoid(x.flatten()) #, att_weight
+class time_combination_nn(nn.Module):
+    def __init__(self,dropout=0.2,input_size=0,output_size=0):
+        super(time_combination_nn, self).__init__()
+        self.ffns_0 = nn.ModuleList()
+        self.ffns = nn.ModuleList()
+        self.ffns_1 = nn.ModuleList()
+        self.ffns2=nn.ModuleList()
+
+        #self.attention=simple_attention_block(input_size=188,output_size=1,num_heads=1,dropout=0.2,num_blocks=1)
+        #for i in range(13): self.ffns_0.append(FFN(188,10, dropout=dropout, activation=False))
+
+        for i in range(input_size):self.ffns.append(FFN(13,20,dropout=dropout, activation=False))
+
+        for i in range(input_size): self.ffns_1.append(FFN(20, 13, dropout=dropout, activation=True))
+        self.ffns2.append(FFN(input_size*13,100,dropout=dropout, activation=True))
+        self.ffns2.append(FFN(100, 1, dropout=dropout, activation=False))
+        #self.layer_normal0 = nn.LayerNorm(input_size )
+        #self.layer_normal1 = nn.LayerNorm(input_size*13)
+    def forward(self, x):
+         #x = self.layer_normal0(x)
+         # output2 = torch.zeros((x.shape[0], x.shape[1], 10))
+         # for j in range(len(self.ffns_0)):
+         #     output2[:,j,:]=self.ffns_0[j](x[:,j,:])
+         # x=torch.cat((x,output2),dim=2)
+         x = x.permute(0, 2, 1)
+         output = torch.zeros((x.shape[0], x.shape[1], 13))
+         for j in range(len(self.ffns)):
+             output[:,j,:]= self.ffns_1[j](self.ffns[j](x[:,j,:]))
+         #x=x+output # res connection
+         #              ,x.std(dim=2).reshape((x.shape[0],188,1)),torch.max(x,dim=2)[0].reshape(x.shape[0],188,1),
+         #              torch.min(x,dim=2)[0].reshape(x.shape[0],188,1)),dim=2)
+         #x=torch.cat((output.flatten(start_dim=1),output2.flatten(start_dim=1)),dim=1)
+         x=output.flatten(start_dim=1)
+         #x=self.attention(output)
+
+         #adding a attentionlayer
+         #x=self.layer_normal1(x.flatten(start_dim=1))
+         for j in range(len(self.ffns2)):
+              x=self.ffns2[j](x)
+         return F.sigmoid(x.flatten())
+
+class time_combination_nn_with_variable_mixer(nn.Module):
+    def __init__(self,dropout=0.2,input_size=0,output_size=0):
+        super(time_combination_nn_with_variable_mixer, self).__init__()
+        self.ffns_0 = nn.ModuleList()
+        self.ffns_01 = nn.ModuleList()
+        self.ffns = nn.ModuleList()
+        self.ffns_10 = nn.ModuleList()
+        self.ffns_11 = nn.ModuleList()
+        self.ffns_12 = nn.ModuleList()
+        self.ffns2=nn.ModuleList()
+        self.ffns_20 = nn.ModuleList()
+        self.ffns_21 = nn.ModuleList()
+
+        #variable_mixing
+        self.ffns_0.append(FFN(input_size,input_size*2, dropout=dropout, activation=True))
+
+        self.ffns_01.append(FFN( input_size * 2,input_size, dropout=dropout, activation=False))
+        # seperate time for mixed variable
+        self.ffns_20.append(FFN(13, 30, dropout=dropout, activation=False))
+        self.ffns_21.append(FFN(30, 30, dropout=dropout, activation=True))
+        #self.ffns_21.activation=nn.Sigmoid()
+        # self.ffns_0[0].lr1.weight.requires_grad = False
+        # self.ffns_0[0].lr1.bias.requires_grad = False
+        # self.ffns_01[0].lr1.weight.requires_grad = False
+        # self.ffns_01[0].lr1.bias.requires_grad = False
+
+
+        #time mixing
+        # for i in range(input_size):self.ffns.append(FFN(13,20,dropout=dropout, activation=False))
+        # for i in range(input_size): self.ffns_1.append(FFN(20, 13, dropout=dropout, activation=True))
+        self.ffns_10.append(FFN(13,30,dropout=dropout, activation=False))
+        self.ffns_11.append(FFN(30, 13, dropout=dropout, activation=True))
+        self.ffns_12.append(FFN(13, 30, dropout=dropout, activation=False))
+
+
+
+
+        #flatten ffn
+        self.ffns2.append(FFN(input_size * 30*2 , 100, dropout=dropout, activation=True))  # True:2 F:1 testing
+        #self.ffns2.append(FFN(input_size*30*2,100,dropout=dropout, activation=True))#True:2 F:1 testing
+        self.ffns2.append(FFN(100, 1, dropout=dropout, activation=False))
+        self.layer_normal0 = nn.LayerNorm(31)
+        self.layer_normal1 = nn.LayerNorm(input_size*2)
+    def forward(self, x):
+         #y=x[:]
+         #x = self.layer_normal0(x)
+         #output2 = torch.zeros((x.shape[0], x.shape[1], x.shape[2]))
+
+         #v mixing and time ixing together
+         output2=self.ffns_01[0](self.ffns_0[0](x[:,:,:])) #+x
+         output2=self.ffns_21[0](self.ffns_20[0](output2.permute(0,2,1)))
+         #output2=F.normalize(output2,dim=2)
+         # fragmented fnns
+
+         #x=y[:]
+         #output2=torch.zeros(x.shape[0],x.shape[2],30)
+
+         #x=torch.zeros(x.shape)
+         #x=torch.cat((x,output2),dim=2)
+
+         x = x.permute(0, 2, 1)
+         #output = torch.zeros((x.shape[0], x.shape[1], 26))
+         # for j in range(len(self.ffns)):
+         #     output[:,j,:]= self.ffns_1[j](self.ffns[j](x[:,j,:]))
+         #time mixing
+         output = self.ffns_11[0](self.ffns_10[0](x[:, :, :]))
+         output=self.ffns_12[0](output)# skip connection  problem time varibale ixing not workng for varibale mixed
+         x = torch.cat((output, output2), dim=1)
+         # varibale metrics mixing
+         #output=self.layer_normal1(output.permute(0,2,1))
+         #output = self.ffns_21[0](self.ffns_20[0](output))
+
+         #x=x+output # res connection
+         #              ,x.std(dim=2).reshape((x.shape[0],188,1)),torch.max(x,dim=2)[0].reshape(x.shape[0],188,1),
+         #              torch.min(x,dim=2)[0].reshape(x.shape[0],188,1)),dim=2)
+         #x=torch.cat((output.flatten(start_dim=1),output2.flatten(start_dim=1)),dim=1)
+         x=x.flatten(start_dim=1)
+         #x=self.attention(output)
+
+         #adding a attentionlayer
+         #x=self.layer_normal1(x.flatten(start_dim=1))
+         for j in range(len(self.ffns2)):
+              x=self.ffns2[j](x)
+         return torch.sigmoid(x.flatten())
+
+class time_combination_nn2(nn.Module):
+    def __init__(self, dropout=0.2, input_size=0, output_size=0):
+        super(time_combination_nn2, self).__init__()
+        self.ffns_00 = nn.ModuleList()
+        self.ffns_01 = nn.ModuleList()
+        self.ffns_02 = nn.ModuleList()
+
+        self.ffns_20 = nn.ModuleList()
+        self.ffns_21 = nn.ModuleList()
+        self.ffns_1 = nn.ModuleList()
+
+
+
+        # self.attention=simple_attention_block(input_size=188,output_size=1,num_heads=1,dropout=0.2,num_blocks=1)
+        # for i in range(13): self.ffns_0.append(FFN(188,10, dropout=dropout, activation=False))
+        for i in range(input_size):
+            #temp1=nn.ModuleList()
+            #temp2=nn.ModuleList()
+            temp=nn.ModuleList()
+            #for j in range(13):
+                #temp1.append(FFN(2, 2, dropout=0, activation=False))
+                #temp2.append(FFN(2, 1, dropout=0, activation=True))
+            temp.append(FFN(2, 1, dropout=0, activation=False))
+            self.ffns_00.append(temp)
+
+        #time mixing
+        self.ffns_01.append(FFN(13, 20, dropout=dropout, activation=False))
+        self.ffns_02.append(FFN(20, 13, dropout=dropout, activation=True))
+
+
+        #self.ffns_20.append(FFN(input_size*2, 20, dropout=dropout, activation=True))
+        #self.ffns_21.append(FFN(20, 13, dropout=dropout, activation=False))
+
+
+        self.ffns_1.append(FFN(input_size * 13, 100, dropout=dropout, activation=True))
+        self.ffns_1.append(FFN(100, 1, dropout=dropout, activation=False))
+
+        self.layer_normal1 = nn.LayerNorm(input_size * 2)
+
+    def forward(self, x):
+        #x=self.layer_normal1(x)
+        #output3 = torch.zeros((x.shape[0],13))
+        #for j in range(len(self.ffns_20)):
+        #output3=self.ffns_21[0](self.ffns_20[0](x[:,-1,:]))
+        #x=torch.cat((x,output2),dim=2)
+        x = x.permute(0, 2, 1)
+        output = torch.zeros((x.shape[0], int(x.shape[1]/2), 13))
+        output2 = torch.zeros((x.shape[0], 13,int(x.shape[1]/2)))
+        for j in range(int(x.shape[1]/2)):
+            temp=x[:, j*2:j*2+2, :].permute(0,2,1)
+
+            #for k in range(13):
+            output2[:,:,j]=self.ffns_00[j][0](temp[:,:,:]).flatten(start_dim=1)
+            #output[:, j, :] = self.ffns_1[j](self.ffns[j](torch.squeeze(self.ffns_0[j](temp).permute(0,2,1))))
+        output[:, :, :] = self.ffns_02[0](self.ffns_01[0](output2.permute(0,2,1)))
+        # x=x+output # res connection
+        #              ,x.std(dim=2).reshape((x.shape[0],188,1)),torch.max(x,dim=2)[0].reshape(x.shape[0],188,1),
+        #              torch.min(x,dim=2)[0].reshape(x.shape[0],188,1)),dim=2)
+        # x=torch.cat((output.flatten(start_dim=1),output2.flatten(start_dim=1)),dim=1)
+        #output=torch.cat((output.flatten(start_dim=1),output3),dim=1)
+        x = output.flatten(start_dim=1)
+        # x=self.attention(output)
+
+        # adding a attentionlayer
+        #x = self.layer_normal1(x.flatten(start_dim=1))
+        for j in range(len(self.ffns_1)):
+            x = self.ffns_1[j](x)
+        return F.sigmoid(x.flatten())
+
+
+
 class transformer_v2(nn.Module):
     def __init__(self,input_size,output_size,num_blocks,seq_len=13):
         self.num_blocks=num_blocks

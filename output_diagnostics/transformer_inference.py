@@ -36,6 +36,7 @@ def get_pred(model,var_list,output_loc,loc,from_row, to_row,tranformation=None):
     if tranformation is not None:train=tranformation(train)
     # train = train.set_index(key).select_dtypes(
     #     exclude=['object', 'O']).reset_index()  # todo check for better replacement
+    if 'target' in var_list: var_list.remove('target')
     train=train[var_list]
     train = train.replace([np.inf, -np.inf, np.nan, np.inf], 0.00)
 

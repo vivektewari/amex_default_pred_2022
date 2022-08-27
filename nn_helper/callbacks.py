@@ -27,6 +27,14 @@ class MetricsCallback(Callback):
         self.check_interval = check_interval
 
         self.visualizer = Visualizer()
+        self.my_actual=[]
+        self.my_preds = []
+
+    def on_batch_end(self, state: Runner):
+        if state.is_valid_loader:
+            self.my_preds.extend(state.batch['logits'].detach())
+            self.my_actual.extend(state.batch['targets'].detach())
+
 
 
     def on_epoch_end(self, state: Runner):
@@ -44,18 +52,20 @@ class MetricsCallback(Callback):
         if (state.stage_epoch_step + 1) % self.check_interval == 0:
             preds = state.batch['logits']
             #preds[state.batch['targets']]
-            metric=amex_metric(state.batch['targets'], preds)
+            metric=amex_metric(torch.tensor(self.my_actual).flatten(), torch.tensor(self.my_preds).flatten())
+            self.my_actual=[]
+            self.my_preds=[]
             print("{} is {}".format(self.prefix,metric ))
             self.visualizer.display_current_results(state.stage_epoch_step, state.epoch_metrics['train']['loss'],
                                                     name='train_loss')
             self.visualizer.display_current_results(state.stage_epoch_step, state.epoch_metrics['valid']['loss'],
                                                     name='valid_loss')
             self.visualizer.display_current_results(state.stage_epoch_step, metric[0],
-                                                    name='amex_metric')
+                                                    name='amex_metric_on_whole_v')
             self.visualizer.display_current_results(state.stage_epoch_step, metric[1],
-                                                    name='auc')
+                                                    name='auc_on_whole_v')
             self.visualizer.display_current_results(state.stage_epoch_step, metric[2],
-                                                    name='bad_capture')
+                                                    name='bad_capture_on_whole_v')
             sum1=torch.where(state.batch['targets'] == 1, preds, torch.tensor(0.0, dtype=torch.float)).sum()
             sum0 = torch.where(state.batch['targets'] == 0, preds, torch.tensor(0.0, dtype=torch.float)).sum()
             q10=torch.where(state.batch['targets'] == 1, preds, torch.tensor(0.0, dtype=torch.float))
@@ -71,6 +81,10 @@ class MetricsCallback(Callback):
             acc=torchmetrics.Accuracy()
             self.visualizer.display_current_results(state.stage_epoch_step, acc(preds,state.batch['targets'].long()),
                                                     name='accuracy')
+
+
+
+
 class IteratorCallback(Callback):
     def __init__(self,
                  info_dict={},

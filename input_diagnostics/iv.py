@@ -112,7 +112,7 @@ class IV():
         dset['Distr_Good'] = dset['Good'] / dset['Good'].sum()
         dset['Distr_Bad'] = dset['Bad'] / dset['Bad'].sum()
         dset['WoE'] = np.log(dset['Distr_Good'] / dset['Distr_Bad'])
-        dset['Bad_Rate'] = dset['Distr_Bad'] / dset['All']
+        dset['Bad_Rate'] = dset['Bad'] / dset['All']
         dset['Rank_Order'] = (dset['Bad_Rate']-dset['Bad_Rate'].shift(1))>=0
         dset['Rank_Order'][0]=np.nan
         if dset['Value'][len(dset)-1]=='Missing':dset['Rank_Order'][len(dset)-1]=np.nan
@@ -226,6 +226,7 @@ class IV():
         :param excludedList: [string]|variable which will excluded from analysis
         :return: Dataframe|Binned variable with same Shape[0] but different Shape[1] depending on varCatConvert use.
         """
+
         output = pd.DataFrame(index=df.index, columns=[])
         df=df.replace([np.inf,-np.inf],np.nan)
         objectCols = list(df.select_dtypes(include=['object']).columns)
@@ -236,7 +237,7 @@ class IV():
 
 
         uniques = pd.DataFrame({'nuniques': df[numCols].nunique()}, index=df[numCols].columns.values)
-        numCats = list(uniques[uniques['nuniques'] < 50].index)
+        numCats = list(uniques[uniques['nuniques'] < maxobjectFeatures].index)
         catCols = objectCols + numCats
         contCols = list(set(allCols) - set(catCols))
         if self.verbose == 1: print("starting binning")

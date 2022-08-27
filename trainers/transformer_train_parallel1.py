@@ -4,7 +4,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 from utils.funcs import count_parameters
 
-def train(model,data_loader,data_loader_v,loss_func,callbacks=None,pretrained=None,lr=0.05,epoch=100):
+def train(model,data_loader,data_loader_v,loss_func,callbacks=None,pretrained=None,lr=0.5,epoch=100):
 
 
     criterion = loss_func()
@@ -23,12 +23,12 @@ def train(model,data_loader,data_loader_v,loss_func,callbacks=None,pretrained=No
 
     #print("train: {}, val: {}".format( len(data_loader), len(data_loader_v)))
     loaders = {
-        "train": DataLoader(data_loader,batch_size=256,
+        "train": DataLoader(data_loader,batch_size=256*8,
                             shuffle=False,
                             num_workers=4,
                             pin_memory=True,
                             drop_last=False),
-        "valid":DataLoader(data_loader_v,batch_size=4096*1,#*20
+        "valid":DataLoader(data_loader_v,batch_size=4096*5,
                             shuffle=False,
                             num_workers=4,
                             pin_memory=True,
@@ -64,7 +64,7 @@ if __name__ == "__main__":
     import models.models as mdl
     #load dataloader
     data_loader_ = dl.__dict__[config.data_loader]
-    identifier= 'from_radar/rad_stan_' #'intermediate_data/woe_stan_' #'intermediate_data/incremental_'
+    identifier= 'from_radar/playground/7/' #'intermediate_data/woe_stan_' #'intermediate_data/incremental_'
     pickle_jar = [config.data_loc + identifier+'devdict1.pkl', config.data_loc +  identifier+ 'devdict2.pkl']
     data_loader=data_loader_(group=pickle_jar, n_skill=4, max_seq=13, dev=True)
     pickle_jar = [config.data_loc  + identifier+ 'hold_outdict1.pkl', config.data_loc + identifier+ 'hold_outdict2.pkl']

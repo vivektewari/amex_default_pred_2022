@@ -4,30 +4,57 @@ from iv import IV
 from common import *
 import pandas as pd
 
+cols=['customer_ID', 'S_3', 'P_2', 'D_48', 'D_61', 'D_55', 'D_62', 'B_17', 'D_77', 'D_53', 'S_7', 'P_3', 'D_43', 'R_27', 'D_42', 'D_46', 'D_56', 'S_27', 'D_50', 'D_132', 'D_130', 'D_131', 'D_115', 'D_76', 'B_13', 'D_118', 'D_119', 'D_121', 'D_128', 'D_134', 'D_142', 'D_105', 'target']
+with open(config.weight_loc + "all_var2", "r") as fp:cols = json.load(fp)
+cols=cols+['customer_ID']+['target']
+if 0:
+    train=pd.DataFrame()
+    for i in range(5):
 
-train=pd.read_csv(config.data_loc+"from_radar/"+"dev.csv",nrows=1500000)#
+        if i == 0:
+            temp=pd.read_csv(config.data_loc+"from_radar/original_radar/90_10_split/"+"dev.csv",usecols=cols,nrows=1000000,header=0).groupby('customer_ID').tail(4).reset_index().drop('customer_ID', axis=1)
+        else:
+            temp = pd.read_csv(config.data_loc + "from_radar/original_radar/90_10_split/" + "dev.csv", usecols=cols,
+                           nrows=1000000, header=0, skiprows=(1, 1000000 * i)).groupby('customer_ID').tail(
+            4).reset_index().drop('customer_ID', axis=1)
+        train= train.append(temp)
+
+        temp=0
+        print(train.shape)
+    train=train.reset_index().drop(['index','level_0'],axis=1)
 
 #only doing on ast observatiion
-if 1:
+if 0:
 
     a = IV(getWoe=1, verbose=1,sort_feature=None)
-    train = train.groupby('customer_ID').tail(1).reset_index().drop('customer_ID', axis=1)
-    binned=a.binning(train,'target',maxobjectFeatures=100,varCatConvert=1,qCut=10)
-    ivData=a.iv_all(binned,'target')
+    #train = train.groupby('customer_ID').tail(4).reset_index().drop('customer_ID', axis=1)
+    train=a.binning(train,'target',maxobjectFeatures=50,varCatConvert=1,qCut=40)
+    ivData=a.iv_all(train,'target')
     a.saveVarcards(config.output_loc+'eda/feature_importance/')
 #binned.to_csv(config.data_loc+'intermediate_data/binned.csv')
 if 0:
-    a=IV(verbose=1)
-    a.load(config.output_loc+'eda/feature_importance/')
-    a.excludeList=['customer_ID','target']
-    converted=a.convertToWoe(train)
-    converted['customer_ID']=train['customer_ID']
-    converted['target'] = train['target']
-    converted.to_csv(config.data_loc+'from_radar/v_woed.csv',index=False)
+    for file in ['dev.csv','hold_out.csv']:
+        train = pd.read_csv(config.data_loc + "from_radar/original_radar/90_10_split/" + file, usecols=cols)  #
+        a=IV(verbose=0)
+        a.load(config.output_loc+'eda/feature_importance/')
+        a.excludeList=['customer_ID','target']
+        converted=a.convertToWoe(train)
+        converted['customer_ID']=train['customer_ID']
+        converted['target'] = train['target']
+        converted.to_csv(config.data_loc+'from_radar/playground/7/'+file,index=False)
+        converted,train=0,0#free up memmory
+if 1:#woe implementation
+    from transformations import woe_transformation
+
+    cols = list(pd.read_csv(config.data_loc + '/from_radar/playground/6/dev.csv', nrows=1).columns)
+    #varlist.remove('target')
+    transformation=woe_transformation(woe_file=config.output_loc+'eda/feature_importance/',varlist=cols)
+    for file in ['hold_out.csv','dev.csv', ]:
+        transformation.output_loc=config.data_loc+'from_radar/playground/7/'+file
+        transformation(config.data_loc + "from_radar/original_radar/90_10_split/" + file)
 
 
-
-if 1:
+if  0:
     #ivData =pd.read_csv(config.output_loc+'eda/feature_importance/'+"iv.csv")
     writer = pd.ExcelWriter(config.output_loc+'eda/feature_importance/'+config.feature_file_name)
     ivData.to_excel(writer,sheet_name="iv_detailed")

@@ -14,7 +14,7 @@ feature_file_name: "feature_importance_v3.xlsx"
 
 ## MODEL params
 model_arch: transformer_encoder_block
-model:  simple_nn #var_attention_block #transformer_v1 #transformer_v1   #simple_nn #simple_attention_block #
+model: time_combination_nn_with_variable_mixer #time_combination_nn #simple_nn #var_attention_block #transformer_v1 #transformer_v1   #simple_nn #simple_attention_block #
 input_dim: [1,53,12,12]
 (self,input_size,output_size,num_heads=4,drop_out=0:
   2):

@@ -110,7 +110,7 @@ class amex_dataset(Dataset):
         # else: outs[-1,-12:]=torch.rand((12,))-0.5
         #print(outs[-1,-12:].mean())
 
-        if self.dev: return {'image_pixels':outs.to(torch.float32),'targets':torch.tensor(self.group_t[index],dtype=torch.float32)}
+        if self.dev: return {'image_pixels':outs.to(torch.float32),'targets':torch.tensor(self.group_t[user_id],dtype=torch.float32)}
         else:return {'image_pixels':outs.to(torch.float32),'targets':torch.tensor(0,dtype=torch.float32)}
 
     @classmethod
@@ -140,9 +140,11 @@ class amex_dataset(Dataset):
         max_row=rows[-1]+1
         print(max_row)
         if var_list is  None:
-            with open(config.weight_loc + "all_var", "r") as fp:var_list = json.load(fp)
-        del var_list['S_2']
-        var_list=list(var_list.keys())
+            with open(config.weight_loc + "all_var2", "r") as fp:var_list = json.load(fp)
+        try:del var_list['S_2']
+        except:pass
+        #var_list=list(var_list)
+
         while from_row <= max_row:
             if from_row==max_row:break
             elif loop*batch<=len(rows):
@@ -154,17 +156,23 @@ class amex_dataset(Dataset):
             else:train=df_loc
             train=train.set_index(key).replace([np.inf,-np.inf,np.nan,np.inf],0.00).select_dtypes(exclude=['object','O']).reset_index() #todo check for better replacement
 
-            if train.shape[0]>1:group=group.append(train.groupby('customer_ID').apply(breakinUsers))
+            if train.shape[0]>1:
+                group=group.append(train.groupby('customer_ID').apply(breakinUsers))
+                #check
+                # if from_row==0:
+                #     train.to_csv(save_loc +identifier+'group.csv',index=False)
+                # else:
+                #     train.to_csv(save_loc +identifier+'group.csv',index=False,header=False,mode='a')
             loop+=1
             print(from_row,to_row)
             from_row = to_row
 
-            if save_loc is not None:
+        if save_loc is not None:
                 with open(save_loc +identifier+'dict1.pkl', 'wb') as f:
-                    pickle.dump(group.reset_index(drop=True).to_dict(), f)
+                    pickle.dump(group.to_dict(), f)
                 if target is not None:
                     with open(save_loc+identifier+'dict2.pkl', 'wb') as f:
-                        pickle.dump(target_dict.reset_index(drop=True).to_dict(), f)
+                        pickle.dump(target_dict.to_dict(), f)
         if target is not None:
             return group.reset_index(drop=True).to_dict(),target_dict.reset_index(drop=True).to_dict()
         else: return group.reset_index(drop=True).to_dict()
@@ -178,10 +186,23 @@ class amex_dataset(Dataset):
 if __name__ == "__main__":
     from input_diagnostics.common import *
     import random
+
+    var_list = ['B_13', 'B_17', 'D_105', 'D_115', 'D_118', 'D_119', 'D_121', 'D_128',
+       'D_130', 'D_131', 'D_132', 'D_134', 'D_142', 'D_42', 'D_43', 'D_46',
+       'D_48', 'D_50', 'D_53', 'D_55', 'D_56', 'D_61', 'D_62', 'D_76', 'D_77',
+       'P_2', 'P_3', 'R_27', 'S_27', 'S_3', 'S_7']
+    with open(config.weight_loc + "all_var2", "r") as fp:
+        var_list = json.load(fp)
+
+    #d_scores=2,3,4,5,7,8,11,13,14,15,17,18,19,20,21
+    # for v in var_list[:]:
+    #     var_list.append(v+'_missing')
+    # var_list.sort()
     def west1():
-        for file in ['dev','hold_out']:
-            df_loc='/home/pooja/PycharmProjects/amex_default_kaggle/data/intermediate_data/'+'rad_stan_'+file+'.csv'
-            t=amex_dataset.create_dict(df_loc=df_loc,key='customer_ID',var_drop=['customer_ID','target'],target='target',batch=50000,max_row=None,identifier='from_radar/rad_stan_'+file,save_loc=config.data_loc)
+        identifier='from_radar/playground/7/'
+        for file in ['dev','hold_out' ]:#,'hold_out' 'dev'
+            df_loc=config.data_loc+identifier+ file+'.csv'
+            t=amex_dataset.create_dict(df_loc=df_loc,key='customer_ID',var_drop=['customer_ID','target'],target='target',batch=100000,max_row=None,identifier=identifier+file,save_loc=config.data_loc,var_list=var_list)
         #pickle_jar=[config.data_loc +'data_created/'+'dict1.pkl',config.data_loc +'data_created/'+'dict2.pkl']
         #q=amex_dataset(groupzxc = pickle_jar, n_skill = 4, max_seq = 13, dev = True)
         #d=q.__getitem__(3)
