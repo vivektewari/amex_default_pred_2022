@@ -72,7 +72,7 @@ if __name__ == "__main__":
     #load model and cost function
     model=mdl.__dict__[config.model]
     #model=model(input_size=1,output_size=1,num_blocks=4,num_heads=2)
-    model = model(input_size=188, output_size=1, dropout=0.1)
+    model = model(input_size=24, output_size=1, dropout=0.1)
     loss_func=loss.__dict__[config.loss_func]
     callbacks = [MetricsCallback(input_key="targets", output_key="logits",
                          directory=config.weight_loc, model_name='transformer_v1',check_interval=1)]

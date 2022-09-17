@@ -4,7 +4,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 from utils.funcs import count_parameters
 
-def train(model,data_loader,data_loader_v,loss_func,callbacks=None,pretrained=None,lr=1,epoch=100):
+def train(model,data_loader,data_loader_v,loss_func,callbacks=None,pretrained=None,lr=0.1,epoch=100):
 
 
     criterion = loss_func()
@@ -64,7 +64,7 @@ if __name__ == "__main__":
     import models.models as mdl
     #load dataloader
     data_loader_ = dl.__dict__[config.data_loader]
-    identifier= 'from_radar/playground/1/' #'intermediate_data/woe_stan_' #'intermediate_data/incremental_'
+    identifier= 'from_radar/playground/3/' #'intermediate_data/woe_stan_' #'intermediate_data/incremental_'
     pickle_jar = [config.data_loc + identifier+'devdict1.pkl', config.data_loc +  identifier+ 'devdict2.pkl']
     data_loader=data_loader_(group=pickle_jar, n_skill=4, max_seq=13, dev=True)
     pickle_jar = [config.data_loc  + identifier+ 'hold_outdict1.pkl', config.data_loc + identifier+ 'hold_outdict2.pkl']
@@ -76,5 +76,5 @@ if __name__ == "__main__":
     loss_func=loss.__dict__[config.loss_func]
     callbacks = [MetricsCallback(input_key="targets", output_key="logits",
                          directory=config.weight_loc, model_name='transformer_v1',check_interval=1)]
-    pretrained=None#config.weight_loc+'transformer_v1_5.pth'
+    pretrained=config.weight_loc+'transformer_v1_100.pth'
     train(model=model,data_loader=data_loader, data_loader_v= data_loader_v,loss_func=loss_func,callbacks=callbacks,pretrained= pretrained)#config.weight_loc

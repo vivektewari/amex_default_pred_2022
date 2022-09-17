@@ -1,6 +1,8 @@
 import torch.nn.functional as F
 import torch.nn as nn
 import torch
+import torch.nn.init as init
+import math
 import numpy as np
 
 #from multibox_loss import *
@@ -12,7 +14,7 @@ class FFN(nn.Module):
         self.state_size = input_size
         #self.layer_normal = nn.LayerNorm(input_size)
         self.lr1 = nn.Linear(input_size, final_size)
-        self.activation= nn.LeakyReLU() #nn.ReLU()
+        self.activation=nn.ReLU()# nn.LeakyReLU() #
         self.dropout = nn.Dropout(dropout)
         self.apply_activation=activation
 
@@ -213,6 +215,7 @@ class time_combination_nn(nn.Module):
         for i in range(input_size): self.ffns_1.append(FFN(20, 13, dropout=dropout, activation=True))
         self.ffns2.append(FFN(input_size*13,100,dropout=dropout, activation=True))
         self.ffns2.append(FFN(100, 1, dropout=dropout, activation=False))
+        #self.reset_parameters()
         #self.layer_normal0 = nn.LayerNorm(input_size )
         #self.layer_normal1 = nn.LayerNorm(input_size*13)
     def forward(self, x):
@@ -237,6 +240,12 @@ class time_combination_nn(nn.Module):
          for j in range(len(self.ffns2)):
               x=self.ffns2[j](x)
          return F.sigmoid(x.flatten())
+    def reset_parameters(self):
+        init.kaiming_uniform_(self.weight, a=math.sqrt(5))
+        if self.bias is not None:
+            fan_in, _ = init._calculate_fan_in_and_fan_out(self.weight)
+            bound = 1 / math.sqrt(fan_in)
+            init.uniform_(self.bias, -bound, bound)
 
 class time_combination_nn_with_variable_mixer(nn.Module):
     def __init__(self,dropout=0.2,input_size=0,output_size=0):
