@@ -17,12 +17,29 @@ class FFN(nn.Module):
         self.activation=nn.ReLU()# nn.LeakyReLU() #
         self.dropout = nn.Dropout(dropout)
         self.apply_activation=activation
+        #self.init_layer(self.lr1)
 
     def forward(self, x):
         x = self.lr1(x)
         if self.apply_activation:x = self.activation(x)
 
         return self.dropout(x)
+
+    @staticmethod
+    def init_layer(layer):
+        nn.init.kaiming_uniform(layer.weight, mode='fan_in', nonlinearity='relu')
+        if hasattr(layer, "bias"):
+            if layer.bias is not None:
+                layer.bias.data.fill_(0.)
+        #layer.weight.data.fill_(0.01)
+
+    # def init_weight(self):
+    #     for i in range(self.num_blocks):
+    #         self.init_layer(self.conv_blocks[i].conv)
+    #
+    #     if self.fc1_p[0] is not None:
+    #         self.init_layer(self.fc1)
+    #         self.init_layer(self.fc2)
 class transformer_encoder_block_v2(nn.Module):
     def __init__(self,input_size,output_size,num_heads=2,dropout=0.2):
         super(transformer_encoder_block_v2, self).__init__()
@@ -239,13 +256,12 @@ class time_combination_nn(nn.Module):
          #x=self.layer_normal1(x.flatten(start_dim=1))
          for j in range(len(self.ffns2)):
               x=self.ffns2[j](x)
-         return F.sigmoid(x.flatten())
-    def reset_parameters(self):
-        init.kaiming_uniform_(self.weight, a=math.sqrt(5))
-        if self.bias is not None:
-            fan_in, _ = init._calculate_fan_in_and_fan_out(self.weight)
-            bound = 1 / math.sqrt(fan_in)
-            init.uniform_(self.bias, -bound, bound)
+         return torch.sigmoid(x.flatten())
+
+
+        # init_layer(self.conv2)
+        # init_bn(self.bn1)
+        # init_bn(self.bn2)
 
 class time_combination_nn_with_variable_mixer(nn.Module):
     def __init__(self,dropout=0.2,input_size=0,output_size=0):

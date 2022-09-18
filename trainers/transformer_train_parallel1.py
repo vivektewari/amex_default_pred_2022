@@ -4,7 +4,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 from utils.funcs import count_parameters
 
-def train(model,data_loader,data_loader_v,loss_func,callbacks=None,pretrained=None,lr=0.5,epoch=100):
+def train(model,data_loader,data_loader_v,loss_func,callbacks=None,pretrained=None,lr=0.01,epoch=100):
 
 
     criterion = loss_func()
@@ -23,12 +23,12 @@ def train(model,data_loader,data_loader_v,loss_func,callbacks=None,pretrained=No
 
     #print("train: {}, val: {}".format( len(data_loader), len(data_loader_v)))
     loaders = {
-        "train": DataLoader(data_loader,batch_size=256*8,
+        "train": DataLoader(data_loader,batch_size=256,
                             shuffle=False,
                             num_workers=4,
                             pin_memory=True,
                             drop_last=False),
-        "valid":DataLoader(data_loader_v,batch_size=4096*5,
+        "valid":DataLoader(data_loader_v,batch_size=4096*50,
                             shuffle=False,
                             num_workers=4,
                             pin_memory=True,
@@ -64,7 +64,7 @@ if __name__ == "__main__":
     import models.models as mdl
     #load dataloader
     data_loader_ = dl.__dict__[config.data_loader]
-    identifier= 'from_radar/playground/7/' #'intermediate_data/woe_stan_' #'intermediate_data/incremental_'
+    identifier= 'from_radar/playground/3/' #'intermediate_data/woe_stan_' #'intermediate_data/incremental_'
     pickle_jar = [config.data_loc + identifier+'devdict1.pkl', config.data_loc +  identifier+ 'devdict2.pkl']
     data_loader=data_loader_(group=pickle_jar, n_skill=4, max_seq=13, dev=True)
     pickle_jar = [config.data_loc  + identifier+ 'hold_outdict1.pkl', config.data_loc + identifier+ 'hold_outdict2.pkl']
@@ -72,9 +72,9 @@ if __name__ == "__main__":
     #load model and cost function
     model=mdl.__dict__[config.model]
     #model=model(input_size=1,output_size=1,num_blocks=4,num_heads=2)
-    model = model(input_size=188, output_size=1, dropout=0.1)
+    model = model(input_size=31, output_size=1, dropout=0.1)
     loss_func=loss.__dict__[config.loss_func]
     callbacks = [MetricsCallback(input_key="targets", output_key="logits",
                          directory=config.weight_loc, model_name='transformer_v1',check_interval=1)]
-    pretrained=config.weight_loc+'transformer_v1_9.pth'
+    pretrained=config.weight_loc+'transformer_v1_99.pth'
     train(model=model,data_loader=data_loader, data_loader_v= data_loader_v,loss_func=loss_func,callbacks=callbacks,pretrained= pretrained)#config.weight_loc

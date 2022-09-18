@@ -76,5 +76,5 @@ if __name__ == "__main__":
     loss_func=loss.__dict__[config.loss_func]
     callbacks = [MetricsCallback(input_key="targets", output_key="logits",
                          directory=config.weight_loc, model_name='transformer_v1',check_interval=1)]
-    pretrained=config.weight_loc+'transformer_v1_100.pth'
+    pretrained=None#config.weight_loc+'transformer_v1_100.pth'
     train(model=model,data_loader=data_loader, data_loader_v= data_loader_v,loss_func=loss_func,callbacks=callbacks,pretrained= pretrained)#config.weight_loc
