@@ -15,6 +15,7 @@ class MetricsCallback(Callback):
                  input_key: str = "targets",
                  output_key: str = "logits",
                  prefix: str = "amex_metric",
+                 visdom_env:str='default'
 
                  ):
         super().__init__(CallbackOrder.Metric)
@@ -26,7 +27,7 @@ class MetricsCallback(Callback):
         self.model_name = model_name
         self.check_interval = check_interval
 
-        self.visualizer = Visualizer()
+        self.visualizer = Visualizer(env=visdom_env)
         self.my_actual=[]
         self.my_preds = []
 
@@ -56,6 +57,10 @@ class MetricsCallback(Callback):
             self.my_actual=[]
             self.my_preds=[]
             print("{} is {}".format(self.prefix,metric ))
+            reg_loss=0
+            for param in state.model.parameters(): reg_loss += torch.sum(param.detach()** 2)
+            self.visualizer.display_current_results(state.epoch_step, reg_loss,
+                                                    name='regularization_loss')
             self.visualizer.display_current_results(state.epoch_step, state.epoch_metrics['train']['loss'],
                                                     name='train_loss')
             self.visualizer.display_current_results(state.epoch_step, state.epoch_metrics['valid']['loss'],

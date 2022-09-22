@@ -4,7 +4,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 from utils.funcs import count_parameters
 
-def train(model,data_loader,data_loader_v,loss_func,callbacks=None,pretrained=None,lr=0.01,epoch=100):
+def train(model,data_loader,data_loader_v,loss_func,callbacks=None,pretrained=None,lr=0.1,epoch=100):
 
 
     criterion = loss_func()
@@ -16,7 +16,7 @@ def train(model,data_loader,data_loader_v,loss_func,callbacks=None,pretrained=No
         checkpoint = torch.load(pretrained, map_location=device)
         model.load_state_dict(checkpoint)
         model.eval()
-    optimizer = optim.SGD(model.parameters(), lr=lr)
+    optimizer = optim.SGD(model.parameters(), lr=lr,weight_decay=0.0001)
 
 
 
@@ -75,6 +75,6 @@ if __name__ == "__main__":
     model = model(input_size=31, output_size=1, dropout=0.1)
     loss_func=loss.__dict__[config.loss_func]
     callbacks = [MetricsCallback(input_key="targets", output_key="logits",
-                         directory=config.weight_loc, model_name='transformer_v1',check_interval=1)]
-    pretrained=config.weight_loc+'transformer_v1_99.pth'
+                         directory=config.weight_loc, model_name='transformer_v1',check_interval=1,visdom_env='with_regularization_div_10')]
+    pretrained=None #config.weight_loc+'transformer_v1_99.pth'
     train(model=model,data_loader=data_loader, data_loader_v= data_loader_v,loss_func=loss_func,callbacks=callbacks,pretrained= pretrained)#config.weight_loc

@@ -17,7 +17,7 @@ class FFN(nn.Module):
         self.activation=nn.ReLU()# nn.LeakyReLU() #
         self.dropout = nn.Dropout(dropout)
         self.apply_activation=activation
-        #self.init_layer(self.lr1)
+        self.init_layer(self.lr1)
 
     def forward(self, x):
         x = self.lr1(x)
@@ -31,7 +31,7 @@ class FFN(nn.Module):
         if hasattr(layer, "bias"):
             if layer.bias is not None:
                 layer.bias.data.fill_(0.)
-        #layer.weight.data.fill_(0.01)
+        #layer.weight.data.fill_(1)
 
     # def init_weight(self):
     #     for i in range(self.num_blocks):
