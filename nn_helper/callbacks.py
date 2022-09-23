@@ -3,7 +3,7 @@ import torch
 import torchmetrics
 from output_diagnostics.metrics import amex_metric
 from utils.visualizer import Visualizer
-
+from utils.gradient_metric import grad_information
 from catalyst.dl  import  Callback, CallbackOrder,Runner
 
 class MetricsCallback(Callback):
@@ -35,6 +35,17 @@ class MetricsCallback(Callback):
         if state.is_valid_loader:
             self.my_preds.extend(state.batch['logits'].detach())
             self.my_actual.extend(state.batch['targets'].detach())
+        if state.loader_batch_step== 1 and state.is_train_loader:
+            print(state.epoch_step)
+            obj=grad_information()
+            output=obj.do_everything(state)
+            counter=1
+            self.visualizer.display_current_results(state.epoch_step, output[0],
+                                                    name='0_grad_count')
+            for ele in output[1]:
+                self.visualizer.display_current_results(state.epoch_step, ele*(10.0**5),
+                                                    name=str(counter))
+                counter+=1
 
 
 
@@ -108,6 +119,8 @@ class IteratorCallback(Callback):
 
         pd.DataFrame(columns=list(self.info_dict.keys()) + list(self.capturing_metrics_list.keys())).to_csv(self.metric_loc,
                                                                                                             index=False)
+
+
 
     def on_epoch_end(self, state: Runner):
         """Event handler for epoch end.
